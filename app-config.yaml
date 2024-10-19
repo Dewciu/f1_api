@@ -1,0 +1,12 @@
+database:
+  host: localhost
+  port: 5432
+  user: user
+  password: password
+  name: f1
+server:
+  host: localhost
+  port: 8080
+  mode: debug
+  api_secret: rzkcwsdxfsssjmcawbdbfxihqwnepdye
+  token_hour_lifetime: 1

@@ -1,0 +1,260 @@
+basePath: /api/v1
+definitions:
+  LoginValidator:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  PermissionResponse:
+    properties:
+      endpoint:
+        type: string
+      id:
+        type: string
+      method:
+        type: string
+    type: object
+  TokenResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  UserCreateModelValidator:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 255
+        minLength: 8
+        type: string
+      username:
+        maxLength: 255
+        minLength: 4
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  UserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+  UserUpdateModelValidator:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 255
+        minLength: 8
+        type: string
+      username:
+        maxLength: 255
+        minLength: 4
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: kacperkrol99@icloud.com
+    name: Kacper Król
+  description: This is an API for F1 application
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: F1 API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Retrieve JWT API token, when given valid username and password
+      parameters:
+      - description: Login Credentials
+        in: body
+        name: Credentials
+        required: true
+        schema:
+          $ref: '#/definitions/LoginValidator'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns JWT token
+          schema:
+            $ref: '#/definitions/TokenResponse'
+      summary: Retrieve JWT API token
+      tags:
+      - auth
+  /users:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all users from the database, with optional filters
+      parameters:
+      - description: User's E-mail
+        in: query
+        name: email
+        type: string
+      - description: User's username
+        in: query
+        name: username
+        type: string
+      - description: User's ID
+        in: query
+        name: id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns list of users
+          schema:
+            items:
+              $ref: '#/definitions/UserResponse'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Get Users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Creates single user in database
+      parameters:
+      - description: User Object
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/UserCreateModelValidator'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns Created User
+          schema:
+            $ref: '#/definitions/UserResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create User
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a user from the database by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      security:
+      - ApiKeyAuth: []
+      summary: Delete User by ID
+      tags:
+      - users
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a user from the database by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns the user
+          schema:
+            $ref: '#/definitions/UserResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get User by ID
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Updates a user in the database by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User Object fields to update
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/UserUpdateModelValidator'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns the updated user
+          schema:
+            $ref: '#/definitions/UserResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update User by ID
+      tags:
+      - users
+  /users/{id}/permissions:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves permission list for specific user by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns user's permissions
+          schema:
+            items:
+              $ref: '#/definitions/PermissionResponse'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve Permissions for the user by ID
+      tags:
+      - users
+schemes:
+- http
+- https
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
