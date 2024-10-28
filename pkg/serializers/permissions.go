@@ -1,6 +1,7 @@
-package permissions
+package serializers
 
 import (
+	m "github.com/dewciu/f1_api/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -13,7 +14,7 @@ type PermissionResponse struct {
 
 type PermissionSerializer struct {
 	C *gin.Context
-	PermissionModel
+	m.Permission
 }
 
 func (s *PermissionSerializer) Response() PermissionResponse {
@@ -29,7 +30,7 @@ func (s *PermissionSerializer) Response() PermissionResponse {
 
 type PermissionsSerializer struct {
 	C           *gin.Context
-	Permissions []PermissionModel
+	Permissions []m.Permission
 }
 
 func (s *PermissionsSerializer) Response() []PermissionResponse {
@@ -45,13 +46,13 @@ func (s *PermissionsSerializer) Response() []PermissionResponse {
 type PermissionGroupResponse struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
-	Permissions []PermissionModel
+	Permissions []m.Permission
 }
 
 type PermissionGroupSerializer struct {
 	C *gin.Context
-	PermissionGroupModel
-	Permissions []PermissionModel
+	m.PermissionGroup
+	Permissions []m.Permission
 }
 
 func (s *PermissionGroupSerializer) Response() PermissionGroupResponse {

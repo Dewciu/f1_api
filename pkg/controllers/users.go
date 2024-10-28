@@ -1,4 +1,4 @@
-package users
+package controllers
 
 import (
 	"errors"
@@ -7,17 +7,28 @@ import (
 
 	_ "github.com/dewciu/f1_api/docs"
 	"github.com/dewciu/f1_api/pkg/common"
-	perm "github.com/dewciu/f1_api/pkg/permissions"
+	d "github.com/dewciu/f1_api/pkg/database"
+	m "github.com/dewciu/f1_api/pkg/models"
+	s "github.com/dewciu/f1_api/pkg/serializers"
+	v "github.com/dewciu/f1_api/pkg/validators"
 	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 )
 
+type UserController struct {
+	DB *gorm.DB
+}
+
+func NewUserController(db *gorm.DB) *UserController {
+	return &UserController{DB: db}
+}
+
 //TODO: Improve error handling -> more descriptive error messages
 
 // @BasePath /api/v1
 
-// LoginController godoc
+// Login godoc
 // @Summary Retrieve JWT API token
 // @Description Retrieve JWT API token, when given valid username and password
 // @Tags auth
@@ -26,19 +37,19 @@ import (
 // @Param Credentials body LoginValidator true "Login Credentials"
 // @Success 200 {object} TokenResponse "Returns JWT token"
 // @Router /auth/login [post]
-func LoginController(c *gin.Context) {
-	var validator LoginValidator
+func (uc *UserController) Login(c *gin.Context) {
+	var validator v.LoginValidator
 
 	if err := c.ShouldBindJSON(&validator); err != nil {
 		c.JSON(http.StatusBadRequest, common.NewError("login", err))
 		return
 	}
 
-	u := UserModel{Username: validator.Username, Password: validator.Password}
+	u := m.User{Username: validator.Username, Password: validator.Password}
 
 	token, err := u.LoginCheck()
 
-	serializer := TokenSerializer{C: c, Token: token}
+	serializer := s.TokenSerializer{C: c, Token: token}
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, common.NewError("login", errors.New("invalid credentials")))
@@ -50,7 +61,7 @@ func LoginController(c *gin.Context) {
 
 // @BasePath /api/v1
 
-// GetAllUsersController godoc
+// GetAllUsers godoc
 // @Summary Get Users
 // @Description Retrieves all users from the database, with optional filters
 // @Tags users
@@ -62,15 +73,15 @@ func LoginController(c *gin.Context) {
 // @Param id query string false "User's ID"
 // @Success 200 {array} UserResponse "Returns list of users"
 // @Router /users [get]
-func GetAllUsersController(c *gin.Context) {
-	var users []UserModel
+func (uc *UserController) GetAllUsers(c *gin.Context) {
+	var users []m.User
 	var err error
 
 	if len(c.Request.URL.Query()) == 0 {
 		fmt.Println(c.Request.URL.Query())
-		users, err = GetAllUsersQuery()
+		users, err = d.GetAllUsersQuery()
 	} else {
-		users, err = GetUsersByFilterQuery(c)
+		users, err = d.GetUsersByFilterQuery(c)
 	}
 
 	if err != nil {
@@ -83,14 +94,14 @@ func GetAllUsersController(c *gin.Context) {
 		return
 	}
 
-	serializer := UsersSerializer{C: c, Users: users}
+	serializer := s.UsersSerializer{C: c, Users: users}
 
 	c.JSON(http.StatusOK, serializer.Response())
 }
 
 // @BasePath /api/v1
 
-// CreateUserController godoc
+// CreateUser godoc
 // @Summary Create User
 // @Description Creates single user in database
 // @Tags users
@@ -100,14 +111,14 @@ func GetAllUsersController(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Success 200 {object} UserResponse "Returns Created User"
 // @Router /users [post]
-func CreateUserController(c *gin.Context) {
-	validator := UserCreateModelValidator{}
+func (uc *UserController) CreateUser(c *gin.Context) {
+	validator := v.UserCreateModelValidator{}
 	if err := validator.Bind(c); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err})
 		return
 	}
 
-	err := CreateUserQuery(validator.UserModel)
+	err := d.CreateUserQuery(validator.UserModel)
 
 	if err != nil {
 		fmt.Println(err)
@@ -121,12 +132,12 @@ func CreateUserController(c *gin.Context) {
 		return
 	}
 
-	serializer := UserSerializer{C: c, UserModel: validator.UserModel}
+	serializer := s.UserSerializer{C: c, User: validator.UserModel}
 
 	c.JSON(http.StatusCreated, serializer.Response())
 }
 
-// GetUserByIDController godoc
+// GetUserByID godoc
 // @Summary Get User by ID
 // @Description Retrieves a user from the database by ID
 // @Tags users
@@ -136,9 +147,9 @@ func CreateUserController(c *gin.Context) {
 // @Param id path string true "User ID"
 // @Success 200 {object} UserResponse "Returns the user"
 // @Router /users/{id} [get]
-func GetUserByIDController(c *gin.Context) {
+func (uc *UserController) GetUserByID(c *gin.Context) {
 	id := c.Param("id")
-	user, err := GetUserByIdQuery(id)
+	user, err := d.GetUserByIdQuery(id)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			c.JSON(http.StatusNotFound, common.NewError("user", errors.New("user not found")))
@@ -147,11 +158,11 @@ func GetUserByIDController(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, common.NewError("user", err))
 		return
 	}
-	serializer := UserSerializer{C: c, UserModel: user}
+	serializer := s.UserSerializer{C: c, User: user}
 	c.JSON(http.StatusOK, serializer.Response())
 }
 
-// DeleteUserByIDController godoc
+// DeleteUserByID godoc
 // @Summary Delete User by ID
 // @Description Deletes a user from the database by ID
 // @Tags users
@@ -161,9 +172,9 @@ func GetUserByIDController(c *gin.Context) {
 // @Param id path string true "User ID"
 // @Success 204 "No Content"
 // @Router /users/{id} [delete]
-func DeleteUserByIDController(c *gin.Context) {
+func (uc *UserController) DeleteUserByID(c *gin.Context) {
 	id := c.Param("id")
-	err := DeleteUserByIdQuery(id)
+	err := d.DeleteUserByIdQuery(id)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			c.JSON(http.StatusNotFound, common.NewError("user", errors.New("user not found")))
@@ -175,7 +186,7 @@ func DeleteUserByIDController(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// UpdateUserController godoc
+// UpdateUser godoc
 // @Summary Update User by ID
 // @Description Updates a user in the database by ID
 // @Tags users
@@ -186,15 +197,15 @@ func DeleteUserByIDController(c *gin.Context) {
 // @Param User body UserUpdateModelValidator true "User Object fields to update"
 // @Success 200 {object} UserResponse "Returns the updated user"
 // @Router /users/{id} [put]
-func UpdateUserController(c *gin.Context) {
+func (uc *UserController) UpdateUser(c *gin.Context) {
 	//TODO Finish update user controller
 	id := c.Param("id")
-	validator := UserUpdateModelValidator{}
+	validator := v.UserUpdateModelValidator{}
 	if err := validator.Bind(c); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err})
 		return
 	}
-	user, err := UpdateUserByIdQuery(id, validator)
+	user, err := d.UpdateUserByIdQuery(id, validator)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			c.JSON(http.StatusNotFound, common.NewError("user", errors.New("user not found")))
@@ -203,13 +214,11 @@ func UpdateUserController(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, common.NewError("user", err))
 		return
 	}
-	serializer := UserSerializer{C: c, UserModel: user}
+	serializer := s.UserSerializer{C: c, User: user}
 	c.JSON(http.StatusOK, serializer.Response())
 }
 
-// TODO Make this controlleer better with serializer and figure out what to do with permissions directory to avoid import cycle
-
-// GetUserWithPermissionsController godoc
+// GetUserWithPermissions godoc
 // @Summary Retrieve Permissions for the user by ID
 // @Description Retrieves permission list for specific user by ID
 // @Tags users
@@ -219,16 +228,16 @@ func UpdateUserController(c *gin.Context) {
 // @Param id path string true "User ID"
 // @Success 200 {object} []PermissionResponse "Returns user's permissions"
 // @Router /users/{id}/permissions [get]
-func GetUserWithPermissionsController(c *gin.Context) {
+func (uc *UserController) GetUserWithPermissions(c *gin.Context) {
 	id := c.Param("id")
 
-	permissions, err := GetPermissionsForUserIDQuery(id)
+	permissions, err := d.GetPermissionsForUserIDQuery(id)
 	if err != nil || len(permissions) == 0 {
 		c.JSON(http.StatusNotFound, common.NewError("permissions", errors.New("permissions not found")))
 		return
 	}
 
-	serializer := perm.PermissionsSerializer{C: c, Permissions: permissions}
+	serializer := s.PermissionsSerializer{C: c, Permissions: permissions}
 	c.JSON(http.StatusOK, serializer.Response())
 }
 

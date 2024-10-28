@@ -5,14 +5,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dewciu/f1_api/pkg/users"
+	"github.com/dewciu/f1_api/pkg/auth"
+	"github.com/dewciu/f1_api/pkg/database"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 func JwtAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token, err := users.ValidateToken(c)
+		token, err := auth.ValidateToken(c)
 		if err != nil {
 			// TODO: Make logging everywhere and more informative
 			logrus.Error(err.Error())
@@ -21,7 +22,7 @@ func JwtAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		req_user_id, err := users.ExtractUserIDFromToken(token)
+		req_user_id, err := auth.ExtractUserIDFromToken(token)
 
 		if err != nil {
 			logrus.Error(err.Error())
@@ -44,7 +45,7 @@ func PermAuthMiddleware(basePath string) gin.HandlerFunc {
 			return
 		}
 
-		permissions, err := users.GetPermissionsForUserIDQuery(req_user_id.(string))
+		permissions, err := database.GetPermissionsForUserIDQuery(req_user_id.(string))
 
 		if err != nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})

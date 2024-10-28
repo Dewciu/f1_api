@@ -3,12 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/dewciu/f1_api/pkg/addresses"
-	"github.com/dewciu/f1_api/pkg/common"
 	"github.com/dewciu/f1_api/pkg/config"
+	"github.com/dewciu/f1_api/pkg/database"
 	"github.com/dewciu/f1_api/pkg/middleware"
-	perm "github.com/dewciu/f1_api/pkg/permissions"
-	"github.com/dewciu/f1_api/pkg/users"
+	"github.com/dewciu/f1_api/pkg/models"
+	"github.com/dewciu/f1_api/pkg/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
@@ -46,12 +45,12 @@ func main() {
 
 	router := SetupRouter()
 
-	if err = common.Connect(conf); err != nil {
+	if err = database.Connect(conf); err != nil {
 		msg := fmt.Sprintf("Failed to connect to DB: %v", err)
 		panic(msg)
 	}
 
-	defer common.Disconnect()
+	defer database.Disconnect()
 
 	if err = Migrate(); err != nil {
 		msg := fmt.Sprintf("Failed to migrate DB: %v", err)
@@ -68,11 +67,11 @@ func main() {
 }
 
 func Migrate() error {
-	if err := common.DB.AutoMigrate(
-		&users.UserModel{},
-		&addresses.AddressModel{},
-		&perm.PermissionModel{},
-		&perm.PermissionGroupModel{},
+	if err := database.DB.AutoMigrate(
+		&models.User{},
+		&models.Address{},
+		&models.Permission{},
+		&models.PermissionGroup{},
 	); err != nil {
 		return err
 	}
@@ -82,11 +81,19 @@ func Migrate() error {
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
-
+	r.Handler()
 	v1 := r.Group("/api/v1")
 	addSwaggerRoutes(v1)
-	users.AddAuthRoutes(v1)
-	users.AddUsersRoutes(v1, middleware.JwtAuthMiddleware(), middleware.PermAuthMiddleware(v1.BasePath()))
+	routes.AddAuthRoutes(
+		v1,
+		database.DB,
+	)
+	routes.AddUsersRoutes(
+		v1,
+		database.DB,
+		middleware.JwtAuthMiddleware(),
+		middleware.PermAuthMiddleware(v1.BasePath()),
+	)
 	return r
 }
 
@@ -95,8 +102,8 @@ func Seed() error {
 
 	adminName := "admin"
 
-	if common.DB.First(&users.UserModel{}, "username = ?", adminName).RowsAffected <= 0 {
-		err := users.CreateUserQuery(users.UserModel{
+	if database.DB.First(&models.User{}, "username = ?", adminName).RowsAffected <= 0 {
+		err := database.CreateUserQuery(models.User{
 			Username: adminName,
 			Password: "admin",
 		})
@@ -105,18 +112,18 @@ func Seed() error {
 		}
 	}
 
-	var permissions [][]perm.PermissionModel = [][]perm.PermissionModel{
-		users.GetUserPermissions(),
-		users.GetAuthPermissions(),
+	var permissions [][]models.Permission = [][]models.Permission{
+		routes.GetUserPermissions(),
+		routes.GetAuthPermissions(),
 	}
 
-	var batchPermissions []perm.PermissionModel
+	var batchPermissions []models.Permission
 
 	for _, permission := range permissions {
 		batchPermissions = append(batchPermissions, permission...)
 	}
 
-	if err := common.DB.Create(&batchPermissions).Error; err != nil {
+	if err := database.DB.Create(&batchPermissions).Error; err != nil {
 		err := err.(*pgconn.PgError)
 
 		if err.Code != "23505" {
@@ -131,3 +138,5 @@ func addSwaggerRoutes(rg *gin.RouterGroup) {
 	swag := rg.Group("/swagger")
 	swag.GET("/*any", swagger.WrapHandler(files.Handler))
 }
+
+//TODO: Consider changing the folder structure (ex. controllers together)

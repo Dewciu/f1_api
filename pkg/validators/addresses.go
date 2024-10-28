@@ -1,7 +1,8 @@
-package addresses
+package validators
 
 import (
 	"github.com/dewciu/f1_api/pkg/common"
+	"github.com/dewciu/f1_api/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -13,7 +14,7 @@ type AddressModelValidator struct {
 		HouseNumber string `form:"house_number" json:"house_number" binding:"required,max=5"`
 		State       string `form:"state" json:"state" binding:"required,max=255"`
 	} `json:"address"`
-	addressModel AddressModel `json:"-"`
+	addressModel models.Address `json:"-"`
 }
 
 func (s *AddressModelValidator) Bind(c *gin.Context) error {
