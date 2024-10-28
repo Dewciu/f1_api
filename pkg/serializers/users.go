@@ -1,6 +1,7 @@
-package users
+package serializers
 
 import (
+	m "github.com/dewciu/f1_api/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -13,7 +14,7 @@ type UserResponse struct {
 
 type UserSerializer struct {
 	C *gin.Context
-	UserModel
+	m.User
 }
 
 func (s *UserSerializer) Response() UserResponse {
@@ -29,7 +30,7 @@ func (s *UserSerializer) Response() UserResponse {
 
 type UsersSerializer struct {
 	C     *gin.Context
-	Users []UserModel
+	Users []m.User
 }
 
 func (s *UsersSerializer) Response() []UserResponse {

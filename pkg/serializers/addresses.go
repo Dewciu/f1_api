@@ -1,6 +1,7 @@
-package addresses
+package serializers
 
 import (
+	m "github.com/dewciu/f1_api/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -14,7 +15,7 @@ type AddressResponse struct {
 
 type AddressSerializer struct {
 	C *gin.Context
-	AddressModel
+	m.Address
 }
 
 func (s *AddressSerializer) Response() AddressResponse {

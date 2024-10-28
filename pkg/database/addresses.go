@@ -1,11 +1,12 @@
-package addresses
+package database
 
 import (
 	"github.com/dewciu/f1_api/pkg/common"
+	m "github.com/dewciu/f1_api/pkg/models"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func CreateAddressQuery(address AddressModel) error {
+func CreateAddressQuery(address m.Address) error {
 	r := common.DB.Create(&address)
 	if r.Error != nil {
 		err := r.Error.(*pgconn.PgError)

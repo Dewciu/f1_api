@@ -1,17 +1,18 @@
-package users
+package validators
 
 import (
 	"github.com/dewciu/f1_api/pkg/common"
+	m "github.com/dewciu/f1_api/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golodash/galidator"
 	"github.com/google/uuid"
 )
 
 type UserCreateModelValidator struct {
-	Username  string    `form:"username" json:"username" binding:"required,alphanum,min=4,max=255"`
-	Email     string    `form:"email" json:"email" binding:"required,email"`
-	Password  string    `form:"password" json:"password" binding:"required,min=8,max=255"`
-	UserModel UserModel `json:"-"`
+	Username  string `form:"username" json:"username" binding:"required,alphanum,min=4,max=255"`
+	Email     string `form:"email" json:"email" binding:"required,email"`
+	Password  string `form:"password" json:"password" binding:"required,min=8,max=255"`
+	UserModel m.User `json:"-"`
 } // @name UserCreateModelValidator
 
 var g = galidator.New()
