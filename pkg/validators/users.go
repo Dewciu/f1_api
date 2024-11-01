@@ -9,10 +9,10 @@ import (
 )
 
 type UserCreateModelValidator struct {
-	Username  string `form:"username" json:"username" binding:"required,alphanum,min=4,max=255"`
-	Email     string `form:"email" json:"email" binding:"required,email"`
-	Password  string `form:"password" json:"password" binding:"required,min=8,max=255"`
-	UserModel m.User `json:"-"`
+	Username string `form:"username" json:"username" binding:"required,alphanum,min=4,max=255"`
+	Email    string `form:"email" json:"email" binding:"required,email"`
+	Password string `form:"password" json:"password" binding:"required,min=8,max=255"`
+	User     m.User `json:"-"`
 } // @name UserCreateModelValidator
 
 var g = galidator.New()
@@ -25,10 +25,10 @@ func (s *UserCreateModelValidator) Bind(c *gin.Context) interface{} {
 		return customizer.DecryptErrors(err)
 	}
 
-	s.UserModel.ID = uuid.New()
-	s.UserModel.Username = s.Username
-	s.UserModel.Email = s.Email
-	s.UserModel.Password = s.Password
+	s.User.ID = uuid.New()
+	s.User.Username = s.Username
+	s.User.Email = s.Email
+	s.User.Password = s.Password
 
 	return nil
 }

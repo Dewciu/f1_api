@@ -3,22 +3,22 @@ package database
 import (
 	"errors"
 
-	a "github.com/dewciu/f1_api/pkg/auth"
+	"github.com/dewciu/f1_api/pkg/auth"
 	"github.com/dewciu/f1_api/pkg/common"
-	"github.com/dewciu/f1_api/pkg/models"
 	m "github.com/dewciu/f1_api/pkg/models"
 	v "github.com/dewciu/f1_api/pkg/validators"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func GetAllUsersQuery() ([]m.User, error) {
 	var users []m.User
-	err := common.DB.Find(&users).Error
+	err := DB.Find(&users).Error
 	return users, err
 }
 func CreateUserQuery(user m.User) error {
-	r := common.DB.Create(&user)
+	r := DB.Create(&user)
 
 	if r.Error != nil {
 		err := r.Error.(*pgconn.PgError)
@@ -36,7 +36,7 @@ func CreateUserQuery(user m.User) error {
 
 func GetUsersByFilterQuery(c *gin.Context) ([]m.User, error) {
 	var users []m.User
-	query := common.DB
+	query := DB
 
 	if username := c.Query("username"); username != "" {
 		query = query.Where("username = ?", username)
@@ -57,7 +57,7 @@ func GetUsersByFilterQuery(c *gin.Context) ([]m.User, error) {
 
 func GetUserByIdQuery(id string) (m.User, error) {
 	var user m.User
-	err := common.DB.Where("id = ?", id).First(&user).Error
+	err := DB.Where("id = ?", id).First(&user).Error
 	if err != nil {
 		return m.User{}, err
 	}
@@ -65,7 +65,7 @@ func GetUserByIdQuery(id string) (m.User, error) {
 }
 
 func DeleteUserByIdQuery(id string) error {
-	err := common.DB.Where("id = ?", id).Delete(&m.User{}).Error
+	err := DB.Where("id = ?", id).Delete(&m.User{}).Error
 	return err
 }
 
@@ -73,36 +73,36 @@ func UpdateUserByIdQuery(id string, userToUpdate v.UserUpdateModelValidator) (m.
 	var user m.User
 
 	if userToUpdate.Password != "" {
-		hash, err := a.GeneratePassword(userToUpdate.Password)
+		hash, err := auth.GeneratePassword(userToUpdate.Password)
 		if err != nil {
 			return m.User{}, err
 		}
 		userToUpdate.Password = hash
 	}
 
-	if err := common.DB.Model(&user).Where("id = ?", id).Updates(userToUpdate).First(&user).Error; err != nil {
+	if err := DB.Model(&user).Where("id = ?", id).Updates(userToUpdate).First(&user).Error; err != nil {
 		return m.User{}, err
 	}
 
 	return user, nil
 }
 
-func GetPermissionsForUserIDQuery(id string) ([]models.Permission, error) {
+func GetPermissionsForUserIDQuery(id string) ([]m.Permission, error) {
 
 	var user m.User
 
-	err := common.DB.Where("id = ?", id).First(&user).Error
+	err := DB.Where("id = ?", id).First(&user).Error
 
 	if err != nil {
-		return []models.Permission{}, err
+		return []m.Permission{}, err
 	}
 
-	var permissions []models.Permission
+	var permissions []m.Permission
 
-	err = common.DB.Model(&user).Association("Permissions").Find(&permissions)
+	err = DB.Model(&user).Association("Permissions").Find(&permissions)
 
 	if err != nil {
-		return []models.Permission{}, err
+		return []m.Permission{}, err
 	}
 
 	if len(permissions) == 0 {
@@ -111,4 +111,35 @@ func GetPermissionsForUserIDQuery(id string) ([]models.Permission, error) {
 	}
 
 	return permissions, nil
+}
+
+func LoginCheck(u m.User) (string, error) {
+
+	var user m.User
+
+	result := DB.Model(&user).Where("username = ?", u.Username).First(&user)
+	err := result.Error
+
+	if err != nil {
+		return "", err
+	}
+
+	err = auth.VerifyPassword(u.Password, user.Password)
+
+	if err != nil && err == bcrypt.ErrMismatchedHashAndPassword {
+		return "", err
+	}
+
+	token, err := auth.GenerateToken(user.ID)
+
+	if err != nil {
+		return "", err
+	}
+
+	err = DB.Model(&user).Where("id = ?", user.ID).Updates(user).Error
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func CreateAddressQuery(address m.Address) error {
-	r := common.DB.Create(&address)
+	r := DB.Create(&address)
 	if r.Error != nil {
 		err := r.Error.(*pgconn.PgError)
 

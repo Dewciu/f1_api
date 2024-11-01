@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/dewciu/f1_api/docs"
 	"github.com/dewciu/f1_api/pkg/common"
+	"github.com/dewciu/f1_api/pkg/database"
 	d "github.com/dewciu/f1_api/pkg/database"
 	m "github.com/dewciu/f1_api/pkg/models"
 	s "github.com/dewciu/f1_api/pkg/serializers"
@@ -47,7 +48,7 @@ func (uc *UserController) Login(c *gin.Context) {
 
 	u := m.User{Username: validator.Username, Password: validator.Password}
 
-	token, err := u.LoginCheck()
+	token, err := database.LoginCheck(u)
 
 	serializer := s.TokenSerializer{C: c, Token: token}
 
@@ -118,7 +119,9 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	err := d.CreateUserQuery(validator.UserModel)
+	user := validator.User
+
+	err := d.CreateUserQuery(user)
 
 	if err != nil {
 		fmt.Println(err)
@@ -132,7 +135,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	serializer := s.UserSerializer{C: c, User: validator.UserModel}
+	serializer := s.UserSerializer{C: c, User: user}
 
 	c.JSON(http.StatusCreated, serializer.Response())
 }
