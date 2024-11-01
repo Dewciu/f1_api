@@ -9,9 +9,18 @@ import (
 	"github.com/dewciu/f1_api/pkg/database"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
-func JwtAuthMiddleware() gin.HandlerFunc {
+type AuthMiddleware struct {
+	DB *gorm.DB
+}
+
+func NewAuthMiddleware(db *gorm.DB) *AuthMiddleware {
+	return &AuthMiddleware{DB: db}
+}
+
+func (am *AuthMiddleware) CheckJWT() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := auth.ValidateToken(c)
 		if err != nil {
@@ -34,7 +43,7 @@ func JwtAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func PermAuthMiddleware(basePath string) gin.HandlerFunc {
+func (am *AuthMiddleware) CheckPermissions(basePath string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := strings.ReplaceAll(c.FullPath(), basePath, "")
 		fmt.Println(path)
@@ -45,7 +54,8 @@ func PermAuthMiddleware(basePath string) gin.HandlerFunc {
 			return
 		}
 
-		permissions, err := database.GetPermissionsForUserIDQuery(req_user_id.(string))
+		repo := database.NewUserRepository(am.DB)
+		permissions, err := repo.GetPermissionsForUserIDQuery(req_user_id.(string))
 
 		if err != nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})

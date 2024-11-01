@@ -83,6 +83,7 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 	r.Handler()
 	v1 := r.Group("/api/v1")
+	authMiddleware := middleware.NewAuthMiddleware(database.DB)
 	addSwaggerRoutes(v1)
 	routes.AddAuthRoutes(
 		v1,
@@ -91,8 +92,8 @@ func SetupRouter() *gin.Engine {
 	routes.AddUsersRoutes(
 		v1,
 		database.DB,
-		middleware.JwtAuthMiddleware(),
-		middleware.PermAuthMiddleware(v1.BasePath()),
+		authMiddleware.CheckJWT(),
+		authMiddleware.CheckPermissions(v1.BasePath()),
 	)
 	return r
 }
@@ -101,9 +102,10 @@ func SetupRouter() *gin.Engine {
 func Seed() error {
 
 	adminName := "admin"
+	repo := database.NewUserRepository(database.DB)
 
 	if database.DB.First(&models.User{}, "username = ?", adminName).RowsAffected <= 0 {
-		err := database.CreateUserQuery(models.User{
+		err := repo.CreateUserQuery(models.User{
 			Username: adminName,
 			Password: "admin",
 		})

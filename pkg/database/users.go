@@ -10,33 +10,40 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
-func GetAllUsersQuery() ([]m.User, error) {
+type UserRepository struct {
+	DB *gorm.DB
+}
+
+func NewUserRepository(db *gorm.DB) *UserRepository {
+	return &UserRepository{DB: db}
+}
+
+func (repo *UserRepository) GetAllUsersQuery() ([]m.User, error) {
 	var users []m.User
-	err := DB.Find(&users).Error
+	err := repo.DB.Find(&users).Error
 	return users, err
 }
-func CreateUserQuery(user m.User) error {
-	r := DB.Create(&user)
+
+func (repo *UserRepository) CreateUserQuery(user m.User) error {
+	r := repo.DB.Create(&user)
 
 	if r.Error != nil {
 		err := r.Error.(*pgconn.PgError)
-
 		if err.Code == "23505" {
 			column := common.GetColumnFromUniqueErrorDetails(err.Detail)
 			return &common.AlreadyExistsError{Column: column}
 		}
-
 		return err
 	}
-
 	return nil
 }
 
-func GetUsersByFilterQuery(c *gin.Context) ([]m.User, error) {
+func (repo *UserRepository) GetUsersByFilterQuery(c *gin.Context) ([]m.User, error) {
 	var users []m.User
-	query := DB
+	query := repo.DB
 
 	if username := c.Query("username"); username != "" {
 		query = query.Where("username = ?", username)
@@ -55,21 +62,21 @@ func GetUsersByFilterQuery(c *gin.Context) ([]m.User, error) {
 	return users, nil
 }
 
-func GetUserByIdQuery(id string) (m.User, error) {
+func (repo *UserRepository) GetUserByIdQuery(id string) (m.User, error) {
 	var user m.User
-	err := DB.Where("id = ?", id).First(&user).Error
+	err := repo.DB.Where("id = ?", id).First(&user).Error
 	if err != nil {
 		return m.User{}, err
 	}
 	return user, nil
 }
 
-func DeleteUserByIdQuery(id string) error {
-	err := DB.Where("id = ?", id).Delete(&m.User{}).Error
+func (repo *UserRepository) DeleteUserByIdQuery(id string) error {
+	err := repo.DB.Where("id = ?", id).Delete(&m.User{}).Error
 	return err
 }
 
-func UpdateUserByIdQuery(id string, userToUpdate v.UserUpdateModelValidator) (m.User, error) {
+func (repo *UserRepository) UpdateUserByIdQuery(id string, userToUpdate v.UserUpdateModelValidator) (m.User, error) {
 	var user m.User
 
 	if userToUpdate.Password != "" {
@@ -80,18 +87,17 @@ func UpdateUserByIdQuery(id string, userToUpdate v.UserUpdateModelValidator) (m.
 		userToUpdate.Password = hash
 	}
 
-	if err := DB.Model(&user).Where("id = ?", id).Updates(userToUpdate).First(&user).Error; err != nil {
+	if err := repo.DB.Model(&user).Where("id = ?", id).Updates(userToUpdate).First(&user).Error; err != nil {
 		return m.User{}, err
 	}
 
 	return user, nil
 }
 
-func GetPermissionsForUserIDQuery(id string) ([]m.Permission, error) {
-
+func (repo *UserRepository) GetPermissionsForUserIDQuery(id string) ([]m.Permission, error) {
 	var user m.User
 
-	err := DB.Where("id = ?", id).First(&user).Error
+	err := repo.DB.Where("id = ?", id).First(&user).Error
 
 	if err != nil {
 		return []m.Permission{}, err
@@ -99,7 +105,7 @@ func GetPermissionsForUserIDQuery(id string) ([]m.Permission, error) {
 
 	var permissions []m.Permission
 
-	err = DB.Model(&user).Association("Permissions").Find(&permissions)
+	err = repo.DB.Model(&user).Association("Permissions").Find(&permissions)
 
 	if err != nil {
 		return []m.Permission{}, err
@@ -113,11 +119,10 @@ func GetPermissionsForUserIDQuery(id string) ([]m.Permission, error) {
 	return permissions, nil
 }
 
-func LoginCheck(u m.User) (string, error) {
-
+func (repo *UserRepository) LoginCheck(u m.User) (string, error) {
 	var user m.User
 
-	result := DB.Model(&user).Where("username = ?", u.Username).First(&user)
+	result := repo.DB.Model(&user).Where("username = ?", u.Username).First(&user)
 	err := result.Error
 
 	if err != nil {
@@ -136,7 +141,7 @@ func LoginCheck(u m.User) (string, error) {
 		return "", err
 	}
 
-	err = DB.Model(&user).Where("id = ?", user.ID).Updates(user).Error
+	err = repo.DB.Model(&user).Where("id = ?", user.ID).Updates(user).Error
 	if err != nil {
 		return "", err
 	}

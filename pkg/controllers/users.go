@@ -7,7 +7,6 @@ import (
 
 	_ "github.com/dewciu/f1_api/docs"
 	"github.com/dewciu/f1_api/pkg/common"
-	"github.com/dewciu/f1_api/pkg/database"
 	d "github.com/dewciu/f1_api/pkg/database"
 	m "github.com/dewciu/f1_api/pkg/models"
 	s "github.com/dewciu/f1_api/pkg/serializers"
@@ -18,11 +17,13 @@ import (
 )
 
 type UserController struct {
-	DB *gorm.DB
+	DB       *gorm.DB
+	userRepo *d.UserRepository
 }
 
 func NewUserController(db *gorm.DB) *UserController {
-	return &UserController{DB: db}
+	userRepo := d.NewUserRepository(db)
+	return &UserController{DB: db, userRepo: userRepo}
 }
 
 //TODO: Improve error handling -> more descriptive error messages
@@ -48,7 +49,7 @@ func (uc *UserController) Login(c *gin.Context) {
 
 	u := m.User{Username: validator.Username, Password: validator.Password}
 
-	token, err := database.LoginCheck(u)
+	token, err := uc.userRepo.LoginCheck(u)
 
 	serializer := s.TokenSerializer{C: c, Token: token}
 
@@ -79,10 +80,9 @@ func (uc *UserController) GetAllUsers(c *gin.Context) {
 	var err error
 
 	if len(c.Request.URL.Query()) == 0 {
-		fmt.Println(c.Request.URL.Query())
-		users, err = d.GetAllUsersQuery()
+		users, err = uc.userRepo.GetAllUsersQuery()
 	} else {
-		users, err = d.GetUsersByFilterQuery(c)
+		users, err = uc.userRepo.GetUsersByFilterQuery(c)
 	}
 
 	if err != nil {
@@ -121,7 +121,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 
 	user := validator.User
 
-	err := d.CreateUserQuery(user)
+	err := uc.userRepo.CreateUserQuery(user)
 
 	if err != nil {
 		fmt.Println(err)
@@ -152,7 +152,8 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 // @Router /users/{id} [get]
 func (uc *UserController) GetUserByID(c *gin.Context) {
 	id := c.Param("id")
-	user, err := d.GetUserByIdQuery(id)
+
+	user, err := uc.userRepo.GetUserByIdQuery(id)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			c.JSON(http.StatusNotFound, common.NewError("user", errors.New("user not found")))
@@ -177,7 +178,8 @@ func (uc *UserController) GetUserByID(c *gin.Context) {
 // @Router /users/{id} [delete]
 func (uc *UserController) DeleteUserByID(c *gin.Context) {
 	id := c.Param("id")
-	err := d.DeleteUserByIdQuery(id)
+
+	err := uc.userRepo.DeleteUserByIdQuery(id)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			c.JSON(http.StatusNotFound, common.NewError("user", errors.New("user not found")))
@@ -208,7 +210,8 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err})
 		return
 	}
-	user, err := d.UpdateUserByIdQuery(id, validator)
+
+	user, err := uc.userRepo.UpdateUserByIdQuery(id, validator)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			c.JSON(http.StatusNotFound, common.NewError("user", errors.New("user not found")))
@@ -234,7 +237,7 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 func (uc *UserController) GetUserWithPermissions(c *gin.Context) {
 	id := c.Param("id")
 
-	permissions, err := d.GetPermissionsForUserIDQuery(id)
+	permissions, err := uc.userRepo.GetPermissionsForUserIDQuery(id)
 	if err != nil || len(permissions) == 0 {
 		c.JSON(http.StatusNotFound, common.NewError("permissions", errors.New("permissions not found")))
 		return
@@ -243,5 +246,3 @@ func (uc *UserController) GetUserWithPermissions(c *gin.Context) {
 	serializer := s.PermissionsSerializer{C: c, Permissions: permissions}
 	c.JSON(http.StatusOK, serializer.Response())
 }
-
-// TODO: Fix errors! Post password: "testtest" email: "test" username: "test"
