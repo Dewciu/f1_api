@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	m "github.com/dewciu/f1_api/pkg/models"
+	"github.com/dewciu/f1_api/pkg/config"
+	"github.com/dewciu/f1_api/pkg/migrations"
+	"github.com/dewciu/f1_api/pkg/seeding"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/postgres"
@@ -16,14 +18,8 @@ var db *gorm.DB
 
 const POSTGRES_PORT = "5432"
 
-var models = []interface{}{
-	m.User{},
-	m.Address{},
-	m.Permission{},
-	m.PermissionGroup{},
-}
-
-func setupDB(tablesAffected []string) {
+func setupDB(tablesAffected []string) *gorm.DB {
+	config.CONFIG_PATH = "../app-config.yaml"
 	ctx := context.Background()
 	postgres_user := "testuser"
 	postgres_password := "testpassword"
@@ -59,9 +55,10 @@ func setupDB(tablesAffected []string) {
 		panic("failed to connect database")
 	}
 
-	db.AutoMigrate(models...)
-
+	migrations.Migrate(db)
 	for _, table := range tablesAffected {
 		db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE;", table))
 	}
+	seeding.Seed(db)
+	return db
 }
