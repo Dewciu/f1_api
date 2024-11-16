@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/dewciu/f1_api/pkg/config"
 	"github.com/dewciu/f1_api/pkg/database"
-	"github.com/dewciu/f1_api/pkg/models"
+	"github.com/dewciu/f1_api/pkg/migrations"
 	"github.com/dewciu/f1_api/pkg/routes"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/dewciu/f1_api/pkg/seeding"
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/dewciu/f1_api/docs"
@@ -32,82 +33,38 @@ import (
 // @BasePath /api/v1
 // @Schemes http https
 func main() {
+	if len(os.Args) < 2 {
+		config.CONFIG_PATH = "app-config.yaml"
+	} else {
+		config.CONFIG_PATH = os.Args[1]
+	}
+
 	conf, err := config.GetConfig()
 
 	if err != nil {
 		logrus.Panicf("Failed to get configuration: %v", err)
 	}
 
-	router := routes.SetupRouter()
+	DB, err := database.Connect(conf)
 
-	if err = database.Connect(conf); err != nil {
+	if err != nil {
 		msg := fmt.Sprintf("Failed to connect to DB: %v", err)
 		panic(msg)
 	}
+	router := routes.SetupRouter(DB)
 
-	defer database.Disconnect()
+	defer database.Disconnect(DB)
 
-	if err = Migrate(); err != nil {
+	if err = migrations.Migrate(DB); err != nil {
 		msg := fmt.Sprintf("Failed to migrate DB: %v", err)
 		panic(msg)
 	}
 
-	if err = Seed(); err != nil {
+	if err = seeding.Seed(DB); err != nil {
 		msg := fmt.Sprintf("Failed to seed DB: %v", err)
 		panic(msg)
 	}
 
 	hostname := fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)
 	router.Run(hostname)
-}
-
-func Migrate() error {
-	if err := database.DB.AutoMigrate(
-		&models.User{},
-		&models.Address{},
-		&models.Permission{},
-		&models.PermissionGroup{},
-	); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TODO: Improve seeding
-func Seed() error {
-
-	adminName := "admin"
-	repo := database.NewUserRepository(database.DB)
-
-	if database.DB.First(&models.User{}, "username = ?", adminName).RowsAffected <= 0 {
-		err := repo.CreateUserQuery(models.User{
-			Username: adminName,
-			Password: "admin",
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	var permissions [][]models.Permission = [][]models.Permission{
-		routes.GetUserPermissions(),
-		routes.GetAuthPermissions(),
-	}
-
-	var batchPermissions []models.Permission
-
-	for _, permission := range permissions {
-		batchPermissions = append(batchPermissions, permission...)
-	}
-
-	if err := database.DB.Create(&batchPermissions).Error; err != nil {
-		err := err.(*pgconn.PgError)
-
-		if err.Code != "23505" {
-			return err
-		}
-	}
-
-	return nil
 }

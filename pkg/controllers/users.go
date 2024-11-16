@@ -46,7 +46,6 @@ func (uc *UserController) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, common.NewError("login", err))
 		return
 	}
-
 	u := m.User{Username: validator.Username, Password: validator.Password}
 
 	token, err := uc.userRepo.LoginCheck(u)

@@ -5,14 +5,13 @@ import (
 	"net/url"
 
 	"github.com/dewciu/f1_api/pkg/config"
+	"github.com/dewciu/f1_api/pkg/models"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-
-func Connect(config *config.Config) error {
+func Connect(config *config.Config) (*gorm.DB, error) {
 	dsn := url.URL{
 		User:     url.UserPassword(config.Database.User, config.Database.Password),
 		Scheme:   "postgres",
@@ -22,18 +21,18 @@ func Connect(config *config.Config) error {
 	}
 
 	var err error
-	DB, err = gorm.Open(postgres.New(postgres.Config{DSN: dsn.String()}), &gorm.Config{})
+	DB, err := gorm.Open(postgres.New(postgres.Config{DSN: dsn.String()}), &gorm.Config{})
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to connect to database: %v", err)
 		logrus.Errorf(msg)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return DB, nil
 }
 
-func Disconnect() error {
+func Disconnect(DB *gorm.DB) error {
 	db, err := DB.DB()
 
 	if err != nil {
@@ -41,4 +40,17 @@ func Disconnect() error {
 	}
 
 	return db.Close()
+}
+
+func Migrate(DB *gorm.DB) error {
+	if err := DB.AutoMigrate(
+		&models.User{},
+		&models.Address{},
+		&models.Permission{},
+		&models.PermissionGroup{},
+	); err != nil {
+		return err
+	}
+
+	return nil
 }
