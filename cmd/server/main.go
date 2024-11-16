@@ -5,15 +5,10 @@ import (
 
 	"github.com/dewciu/f1_api/pkg/config"
 	"github.com/dewciu/f1_api/pkg/database"
-	"github.com/dewciu/f1_api/pkg/middleware"
 	"github.com/dewciu/f1_api/pkg/models"
 	"github.com/dewciu/f1_api/pkg/routes"
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
-
-	files "github.com/swaggo/files"
-	swagger "github.com/swaggo/gin-swagger"
 
 	_ "github.com/dewciu/f1_api/docs"
 )
@@ -43,7 +38,7 @@ func main() {
 		logrus.Panicf("Failed to get configuration: %v", err)
 	}
 
-	router := SetupRouter()
+	router := routes.SetupRouter()
 
 	if err = database.Connect(conf); err != nil {
 		msg := fmt.Sprintf("Failed to connect to DB: %v", err)
@@ -77,25 +72,6 @@ func Migrate() error {
 	}
 
 	return nil
-}
-
-func SetupRouter() *gin.Engine {
-	r := gin.Default()
-	r.Handler()
-	v1 := r.Group("/api/v1")
-	authMiddleware := middleware.NewAuthMiddleware(database.DB)
-	addSwaggerRoutes(v1)
-	routes.AddAuthRoutes(
-		v1,
-		database.DB,
-	)
-	routes.AddUsersRoutes(
-		v1,
-		database.DB,
-		authMiddleware.CheckJWT(),
-		authMiddleware.CheckPermissions(v1.BasePath()),
-	)
-	return r
 }
 
 // TODO: Improve seeding
@@ -135,10 +111,3 @@ func Seed() error {
 
 	return nil
 }
-
-func addSwaggerRoutes(rg *gin.RouterGroup) {
-	swag := rg.Group("/swagger")
-	swag.GET("/*any", swagger.WrapHandler(files.Handler))
-}
-
-//TODO: Consider changing the folder structure (ex. controllers together)
