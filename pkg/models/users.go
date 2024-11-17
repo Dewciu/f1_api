@@ -8,10 +8,10 @@ import (
 // TODO Add permissions to endpoints for the user
 type User struct {
 	Model
-	Username    string        `gorm:"unique;not null; type:varchar(255)" json:"username"`
-	Email       string        `gorm:"unique;not null; type:varchar(255)" json:"email"`
-	Password    string        `gorm:"not null" json:"password"`
-	Permissions []*Permission `gorm:"many2many:user_permissions;"`
+	Username    string       `gorm:"unique;not null; type:varchar(255)" json:"username"`
+	Email       string       `gorm:"unique;not null; type:varchar(255)" json:"email"`
+	Password    string       `gorm:"not null" json:"password"`
+	Permissions []Permission `gorm:"many2many:user_permissions;"`
 } //@name User
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {

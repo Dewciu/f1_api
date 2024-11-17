@@ -12,33 +12,33 @@ import (
 func Seed(DB *gorm.DB) error {
 
 	adminName := "admin"
-	repo := database.NewUserRepository(DB)
+	userRepo := database.NewUserRepository(DB)
 
 	if DB.First(&models.User{}, "username = ?", adminName).RowsAffected <= 0 {
-		err := repo.CreateUserQuery(models.User{
-			Username: adminName,
-			Password: "admin",
+		var permissions [][]models.Permission = [][]models.Permission{
+			routes.GetUserPermissions(),
+			routes.GetAuthPermissions(),
+		}
+
+		var batchPermissions []models.Permission
+
+		for _, permission := range permissions {
+			batchPermissions = append(batchPermissions, permission...)
+		}
+
+		if err := DB.Create(&batchPermissions).Error; err != nil {
+			err := err.(*pgconn.PgError)
+
+			if err.Code != "23505" {
+				return err
+			}
+		}
+		err := userRepo.CreateUserQuery(models.User{
+			Username:    adminName,
+			Password:    "admin",
+			Permissions: batchPermissions,
 		})
 		if err != nil {
-			return err
-		}
-	}
-
-	var permissions [][]models.Permission = [][]models.Permission{
-		routes.GetUserPermissions(),
-		routes.GetAuthPermissions(),
-	}
-
-	var batchPermissions []models.Permission
-
-	for _, permission := range permissions {
-		batchPermissions = append(batchPermissions, permission...)
-	}
-
-	if err := DB.Create(&batchPermissions).Error; err != nil {
-		err := err.(*pgconn.PgError)
-
-		if err.Code != "23505" {
 			return err
 		}
 	}

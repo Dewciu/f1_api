@@ -8,6 +8,6 @@ type Permission struct {
 
 type PermissionGroup struct {
 	Model
-	Name        string        `json:"name"`
-	Permissions []*Permission `gorm:"many2many:permission_group_permissions;"`
+	Name        string       `json:"name"`
+	Permissions []Permission `gorm:"many2many:permission_group_permissions;"`
 } //@name PermissionGroup
