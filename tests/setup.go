@@ -18,7 +18,7 @@ var db *gorm.DB
 
 const POSTGRES_PORT = "5432"
 
-func setupDB(tablesAffected []string) *gorm.DB {
+func SetupDB(tablesAffected []string) (*gorm.DB, tc.Container, context.Context) {
 	config.CONFIG_PATH = "../app-config.yaml"
 	ctx := context.Background()
 	postgres_user := "testuser"
@@ -60,5 +60,6 @@ func setupDB(tablesAffected []string) *gorm.DB {
 		db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE;", table))
 	}
 	seeding.Seed(db)
-	return db
+
+	return db, pg, ctx
 }
