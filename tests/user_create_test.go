@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,48 +13,34 @@ import (
 	"github.com/dewciu/f1_api/pkg/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
+	tc "github.com/testcontainers/testcontainers-go"
+	"gorm.io/gorm"
 )
 
-type UserControllerTestSuite struct {
+type UserCreateTestSuite struct {
 	suite.Suite
-	router *gin.Engine
-	token  string
+	db           *gorm.DB
+	pgContainter tc.Container
+	ctx          context.Context
+	router       *gin.Engine
+	baseHeader   http.Header
 }
 
-func (suite *UserControllerTestSuite) SetupSuite() {
+func (suite *UserCreateTestSuite) SetupSuite() {
 	// Setup the test environment
-	tablesAffected := []string{"users"}
-	db := setupDB(tablesAffected)
-	suite.router = routes.SetupRouter(db)
-	suite.token = suite.authenticate()
-	fmt.Println("SetupSuite")
+	suite.db, suite.pgContainter, suite.ctx = SetupDB([]string{"users"})
+	suite.router = routes.SetupRouter(suite.db)
+	fmt.Println(suite.db)
+	token := suite.authenticate()
+	fmt.Println("tokee")
+	fmt.Println(token)
+	suite.baseHeader = http.Header{
+		"Authorization": []string{token},
+		"Content-Type":  []string{"application/json"},
+	}
 }
 
-func (suite *UserControllerTestSuite) authenticate() string {
-	// Create a new user for authentication
-	// user := m.User{
-	// 	Username: "admin",
-	// 	Password: "admin",
-	// }
-
-	// userToLog := struct {
-	// 	Username string `json:"username"`
-	// 	Password string `json:"password"`
-	// }{
-	// 	Username: "admin",
-	// 	Password: "admin",
-	// }
-
-	// jsonData, _ := json.Marshal(userToLog)
-	// fmt.Println(jsonData)
-	// req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(jsonData))
-	// fmt.Println(req)
-	// req.Header.Set("Content-Type", "application/json")
-
-	// w := httptest.NewRecorder()
-	// suite.router.ServeHTTP(w, req)
-
-	// Perform login to get the token
+func (suite *UserCreateTestSuite) authenticate() string {
 	loginData := map[string]string{
 		"password": "admin",
 		"username": "admin",
@@ -71,9 +58,9 @@ func (suite *UserControllerTestSuite) authenticate() string {
 	return response["token"]
 }
 
-// TODO: Seed the permissions first
-func (suite *UserControllerTestSuite) TestCreateUser() {
-	// Create a new user
+func (suite *UserCreateTestSuite) TestSuccessfulUserCreation() {
+	var createdUser m.User
+	var dbUser m.User
 	user := m.User{
 		Username: "testuser",
 		Email:    "testemail@email.com",
@@ -82,20 +69,71 @@ func (suite *UserControllerTestSuite) TestCreateUser() {
 
 	jsonData, _ := json.Marshal(user)
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/users/", bytes.NewBuffer(jsonData))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", suite.token)
+	req.Header = suite.baseHeader
 
 	w := httptest.NewRecorder()
 	suite.router.ServeHTTP(w, req)
 
-	suite.Equal(http.StatusCreated, w.Code)
-
-	var createdUser m.User
 	err := json.Unmarshal(w.Body.Bytes(), &createdUser)
+	suite.Equal(http.StatusCreated, w.Code)
 	suite.Nil(err)
 	suite.Equal(user.Username, createdUser.Username)
 	suite.Equal(user.Email, createdUser.Email)
-	fmt.Println("TestCreateUser")
+
+	err = suite.db.Where("id = ?", createdUser.ID).First(&dbUser).Error
+	suite.Nil(err)
+	suite.Equal(user.Username, dbUser.Username)
+	suite.Equal(user.Email, dbUser.Email)
+	suite.NotNil(dbUser.Password)
+	fmt.Println(dbUser.Password)
+	suite.NotEqual(user.Password, dbUser.Password)
+}
+
+func (suite *UserCreateTestSuite) TestFailedUserCreationBadRequest() {
+	//TOOD: Add more test cases and error responses when it will be better handled
+	testCases := []m.User{
+		{
+			Username: "testuser",
+			Email:    "testemail@email.com",
+			Password: "short",
+		},
+		{
+			Username: "testuser",
+			Email:    "invalidemail",
+			Password: "testpassword",
+		},
+	}
+
+	for _, user := range testCases {
+		jsonData, _ := json.Marshal(user)
+		req, _ := http.NewRequest(http.MethodPost, "/api/v1/users/", bytes.NewBuffer(jsonData))
+		req.Header = suite.baseHeader
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		suite.Equal(http.StatusBadRequest, w.Code)
+	}
+}
+
+func (suite *UserCreateTestSuite) TestFailedUserCreationConflict() {
+	user := m.User{
+		Username: "testuser",
+		Email:    "testemail@email.com",
+		Password: "testpassword",
+	}
+
+	suite.db.Model(&m.User{}).Create(&user)
+
+	jsonData, _ := json.Marshal(user)
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/users/", bytes.NewBuffer(jsonData))
+	req.Header = suite.baseHeader
+
+	w := httptest.NewRecorder()
+	suite.router.ServeHTTP(w, req)
+
+	suite.Equal(http.StatusConflict, w.Code)
+
 }
 
 // func (suite *UserControllerTestSuite) TestGetUser(t *testing.T) {
@@ -152,6 +190,14 @@ func (suite *UserControllerTestSuite) TestCreateUser() {
 // 	fmt.Println("TestDeleteUser")
 // }
 
-func TestUserControllerTestSuite(t *testing.T) {
-	suite.Run(t, new(UserControllerTestSuite))
+func (suite *UserCreateTestSuite) TearDownTest() {
+	db.Exec("DELETE FROM users WHERE username != 'admin'")
+}
+
+func (suite *UserCreateTestSuite) TearDownSuite() {
+	suite.pgContainter.Terminate(suite.ctx)
+}
+
+func TestUserCreateTestSuite(t *testing.T) {
+	suite.Run(t, new(UserCreateTestSuite))
 }

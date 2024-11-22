@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	_ "github.com/dewciu/f1_api/docs"
@@ -120,10 +119,10 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 
 	user := validator.User
 
+	//TODO: First check if the user exists, then create
 	err := uc.userRepo.CreateUserQuery(user)
 
 	if err != nil {
-		fmt.Println(err)
 		var er *common.AlreadyExistsError
 		if errors.As(err, &er) {
 			err := err.(*common.AlreadyExistsError)

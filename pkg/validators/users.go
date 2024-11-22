@@ -17,6 +17,7 @@ type UserCreateModelValidator struct {
 
 var g = galidator.New()
 
+// TODO: Add custom error messages
 func (s *UserCreateModelValidator) Bind(c *gin.Context) interface{} {
 	err := common.Bind(c, s)
 	customizer := g.Validator(UserCreateModelValidator{})
